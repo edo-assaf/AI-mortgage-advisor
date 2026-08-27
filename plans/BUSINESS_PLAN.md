@@ -11,7 +11,7 @@
 
 **Product**: A fully autonomous AI mortgage advisor for the Israeli market. It replaces the human mortgage broker end-to-end — profiling the borrower, constructing an optimal loan-track mix, preparing the document file, running a competitive tender across all lenders, negotiating rates, verifying the final contract, and monitoring for refinancing opportunities for the life of the loan.
 
-**Why Israel, why now**: Mortgage advisory in Israel requires **no license** (unlike investment advice, which is licensed under the Regulation of Investment Advice Law). Human advisors charge ₪3,000–₪14,000 per file for work that is overwhelmingly document handling, structured optimization, and repetitive multi-party negotiation — all of which are now automatable. The market is large (₪105.7B in new mortgages in 2025) and the advisory layer is fragmented across thousands of sole practitioners.
+**Why Israel, why now**: Mortgage advisory in Israel requires **no license** (unlike investment advice, which is licensed under the Regulation of Investment Advice Law), and the 2016 Regulated Financial Services Law contains no licensable activity that captures it. A licensing bill cleared committee in May 2026, so this window is open but not indefinitely — see `REGULATORY_STRATEGY.md` §9.1. Human advisors charge ₪3,000–₪14,000 per file for work that is overwhelmingly document handling, structured optimization, and repetitive multi-party negotiation — all of which are now automatable. The market is large (₪105.7B in new mortgages in 2025) and the advisory layer is fragmented across thousands of sole practitioners.
 
 **Technology**: A durable agent harness (Temporal-orchestrated, multi-week stateful workflows) wrapping a **deterministic financial core**. The LLM never performs arithmetic or evaluates regulatory compliance; it handles language, documents, judgment, and negotiation. A simulated-lender environment serves as both the POC demonstration surface and the permanent regression suite.
 
@@ -145,7 +145,7 @@ Fee is charged **only on a closed, funded mortgage**. This matters more than it 
 | **Mortgage Watch** subscription | ₪190/yr, ~₪8/yr marginal cost | Refinance monitoring engine (Phase 2) |
 | **Mortgage life & property insurance** | ₪800–2,500 commission per file — this is where human brokers make their real margin | **Requires an insurance agent license.** Options: hire a licensed agent, partner for revenue share, or acquire a small agency. Flagged as the highest-value licensed adjacency. |
 | **Refinance execution** on watched loans | ₪1,490 per event, ~1.5 events per loan lifetime | Nothing new — reuses the core product |
-| **Lender-side SaaS** | Sell the underwriting-file-preparation layer to non-bank lenders drowning in unstructured borrower files | Phase 3 |
+| **Lender-side SaaS** | Sell the underwriting-file-preparation layer to non-bank lenders drowning in unstructured borrower files | Phase 3, and **legally uncertain**: a 2026 Capital Market Authority draft circular bars non-bank lenders from paying mortgage advisors any benefit of economic value on housing loans. Requires a separate entity and counsel clearance — `REGULATORY_STRATEGY.md` §9.2. |
 
 ---
 
@@ -297,7 +297,7 @@ The "how" is described as *our system* and *our process*. Not deceptive, and not
 | Stage | Timing | Goal |
 |-------|--------|------|
 | **POC complete** | Week 8 | Autonomous file executed end-to-end against simulated lenders on test data |
-| **Friendly-file pilot** | Months 3–4 | 5 real files, all refinance, from personal network. **Gated on the legal opinion in `REGULATORY_STRATEGY.md` §2.2.** Fully autonomous execution against real banks, with a human observing and empowered to abort but not to assist. This is the single highest-information experiment in the plan. |
+| **Friendly-file pilot** | Months 3–4 | 5 real files, all refinance, from personal network. **Gated on the POA template and consent flows in `REGULATORY_STRATEGY.md` §10**, not on a licensing answer — that question is closed. Fully autonomous execution against real banks, with a human observing and empowered to abort but not to assist. This is the single highest-information experiment in the plan. |
 | **Soft launch** | Month 4 | Refinance only, 10 files/month, waitlisted. Refinance first: no purchase deadline, so a slow or failed file costs the client an opportunity rather than their home. |
 | **Purchase files** | Month 6 | Add standard purchase after the refinance close rate stabilizes |
 | **Channel activation** | Month 7 | Agent/lawyer and developer partnerships go live |
@@ -348,9 +348,9 @@ Banks may detect and block automated outreach, or refuse files from a non-human 
 A miscalculated affordability figure, a missed regulatory cap, or a misread contract clause harms a client materially. In this category, the reputational damage is unbounded and arrives faster than the legal damage.
 **Mitigation**: **The LLM never computes and never adjudicates compliance.** All arithmetic runs in a deterministic, unit-tested financial core; all regulatory checks run in a rules engine with 100% branch coverage against Directive 329. Every recommendation carries a machine-generated rationale and a full audit trail. Professional indemnity / E&O insurance from day one, budgeted in Phase 1. Independent recomputation of every recommendation by a second implementation before it reaches a client. See `TECHNICAL_ROADMAP.md` §Key Decisions #2.
 
-### R3 — Regulatory change introduces licensing 🟠 **High**
-Israel could regulate mortgage advisory, mandate AI disclosure, or restrict automated financial advice. The Bank of Israel has shown willingness to intervene in this market repeatedly.
-**Mitigation**: See `REGULATORY_STRATEGY.md` in full. Summary: obtain a formal legal opinion on credit-brokerage licensing **before** the friendly-file pilot; build the compliance and audit infrastructure that a licensing regime would demand *before* it is demanded, so a licensing event becomes a moat that eliminates unlicensed competitors rather than an extinction event; maintain a licensed-partner relationship as a standing fallback.
+### R3 — Regulatory change introduces licensing 🔴 **High — now scheduled rather than speculative**
+The credit-brokerage worry is closed: the 2016 Regulated Financial Services Law contains no licensable activity that captures borrower-paid advisory. But a **Regulation of Mortgage Advisory Bill was approved for first reading on 26 May 2026**, with readings two and three deferred to the next Knesset, and the December 2025 inter-agency report on AI in the financial sector recommends mandatory AI-interaction disclosure. Both are live.
+**Mitigation**: See `REGULATORY_STRATEGY.md` §9.1 and §9.6. Determine early whether the bill's threshold conditions can be satisfied by a corporate provider or require a licensed natural person — if the latter, hire one before it is mandatory rather than after. Build the compliance and audit infrastructure a licensing regime would demand *before* it is demanded, so a licensing event eliminates unlicensed competitors rather than us. Maintain a licensed-partner relationship as a standing fallback.
 
 ### R4 — Capitalized competitor moves first 🟠 **High**
 Walty or Cantaio removes their human layer, or a bank launches a free equivalent to foreclose the category.
@@ -358,11 +358,11 @@ Walty or Cantaio removes their human layer, or a bank launches a free equivalent
 
 ### R5 — Privacy breach 🟠 **High**
 We concentrate the most sensitive financial data that exists about a household: income, statements, tax filings, credit history, identity documents.
-**Mitigation**: Amendment 13 to the Privacy Protection Law (in force since 14 Aug 2025) applies to us on two independent grounds and carries significant administrative fines. Treated as a P0 engineering requirement, not a compliance checkbox: encryption at rest and in transit, field-level encryption for identity and income data, strict retention limits with automated purge, DPO appointed, and full compliance with the 2017 Data Security Regulations at the high-security tier. Detail in `REGULATORY_STRATEGY.md` §3.
+**Mitigation**: Amendment 13 to the Privacy Protection Law (in force since 14 Aug 2025) applies to us on two independent grounds and carries significant administrative fines. Treated as a P0 engineering requirement, not a compliance checkbox: encryption at rest and in transit, field-level encryption for identity and income data, strict retention limits with automated purge, DPO appointed, and the 2017 Data Security Regulations built to the high tier even though our formal classification is medium until 100,000 data subjects. Detail in `REGULATORY_STRATEGY.md` §3.
 
 ### R6 — The "presenting as human" position backfires 🟠 **High**
 A bank, journalist, or regulator frames the company as having deceived banks and borrowers.
-**Mitigation**: A hard architectural boundary, enforced in code rather than policy. We operate under a company brand identity with documented borrower authorization; we never fabricate a named licensed individual, never forge a signature, and never assert a false fact about a borrower or a property. The Phase 3 fleet of advisor identities operates entirely within this boundary: every identity is a real registered entity, and identity has no natural-person name field. See `REGULATORY_STRATEGY.md` §5.6. Every outbound communication is logged immutably and is defensible on its face. Prepared public position: *we are a technology company acting as the borrower's authorized agent, and every factual statement we have ever made to a lender is true and on the record.* That position survives scrutiny; anything weaker does not. See `REGULATORY_STRATEGY.md` §5.
+**Mitigation**: A hard architectural boundary, enforced in code rather than policy. We operate under a company brand identity with documented borrower authorization; we never fabricate a named licensed individual, never forge a signature, and never assert a false fact about a borrower or a property. The Phase 3 fleet of advisor identities operates entirely within this boundary: every identity is a real registered entity, and identity has no natural-person name field. See `REGULATORY_STRATEGY.md` §5.3. Every outbound communication is logged immutably and is defensible on its face. Prepared public position: *we are a technology company acting as the borrower's authorized agent, and every factual statement we have ever made to a lender is true and on the record.* That position survives scrutiny; anything weaker does not. See `REGULATORY_STRATEGY.md` §5.
 
 ### R7 — Market freeze 🟡 **Medium**
 Transactions already sit at a 20-year low. A rate shock, war escalation, or credit tightening could compress volume further.
@@ -386,7 +386,7 @@ The domestic mortgage-fee market caps this business. Three vectors, in order of 
 
 1. **Adjacent Israeli products with the same harness (Year 2)**. Mortgage life and property insurance is the immediate one — it is where human brokers earn their real margin and it requires an insurance agent license. Then loan consolidation, all-purpose credit against property, and commercial mortgage. Each reuses the same document parsing, financial core, tender, and negotiation machinery. Realistically **2–3× the addressable market** for incremental engineering.
 
-2. **Lender-side SaaS (Year 2–3)**. Non-bank lenders and smaller institutions receive unstructured borrower files and underwrite them manually. We will have the best borrower-file-structuring pipeline in the market as a byproduct. Selling it back to lenders is a higher-multiple recurring revenue line and it deepens the relationships that make the tender work.
+2. **Lender-side SaaS (Year 2–3)**. Non-bank lenders and smaller institutions receive unstructured borrower files and underwrite them manually. We will have the best borrower-file-structuring pipeline in the market as a byproduct, and selling it back is a higher-multiple recurring revenue line. **Discount this option until cleared**: a 2026 draft circular bars non-bank lenders from paying mortgage advisors any benefit of economic value on housing loans, and the "representative" definition is drafted broadly to prevent relabelling. Viable only in a separate entity processing the lender's own inbound files, and only after counsel confirms the ban is not entity-agnostic (`REGULATORY_STRATEGY.md` §9.2).
 
 3. **Geographic expansion (Year 3+)**. The harness is market-agnostic; the financial core, regulatory rules, language, and lender integrations are market-specific. The realistic first target is another market with an unlicensed or lightly-licensed brokerage layer, a bank-concentrated lending market, and a language where we have an edge. This is a rebuild of roughly 40% of the system per market — the agent harness, workflow engine, document pipeline, memory, and negotiation machinery all carry over.
 
@@ -424,8 +424,9 @@ The domestic mortgage-fee market caps this business. Three vectors, in order of 
 - **`PRODUCT_ROADMAP.md`** — capability prioritization and the 8-week POC plan
 - **`TECHNICAL_ROADMAP.md`** — agent harness architecture, financial core, voice stack, cost model
 - **`REGULATORY_STRATEGY.md`** — licensing analysis, privacy obligations, and the hard boundaries on human presentation
+- **`REGULATORY_ANSWERS.md`** — verified regulatory findings with primary-source citations
 
 ---
 
 **Document Version**: 1.0
-**Open items requiring decision**: insurance-license path (hire vs. partner vs. acquire); legal opinion on credit-brokerage licensing (blocking for the friendly-file pilot); raise-vs-bootstrap trigger confirmation.
+**Open items requiring decision**: insurance-license path (hire vs. partner vs. acquire); whether to hire a licensable mortgage advisor ahead of the pending licensing bill (`REGULATORY_STRATEGY.md` §9.1); raise-vs-bootstrap trigger confirmation.

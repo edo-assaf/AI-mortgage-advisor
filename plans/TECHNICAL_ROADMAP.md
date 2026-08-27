@@ -67,7 +67,6 @@ flowchart TB
     GUARD[🛡️ Guardrail Service<br/>Circuit breakers · caps]:::service
 
     LENDERS[(🏦 Lenders<br/>real or simulated)]:::external
-    BUREAU[(Credit Bureau)]:::external
     BOI[(Bank of Israel<br/>rates & CPI)]:::external
 
     DB[(PostgreSQL<br/>+ pgvector)]:::storage
@@ -111,7 +110,6 @@ flowchart TB
     COMMS --> GUARD
     GUARD -->|block or allow| COMMS
 
-    DOCS --> BUREAU
     TEMPORAL --> LEDGER
     COMMS --> LEDGER
     FIN --> LEDGER
@@ -239,7 +237,7 @@ This is the highest-consequence technology choice in the document. See §6 Decis
 | **TTS** | **BlueTTS via MamboTTS** ([repo](https://github.com/maxmelichov/MamboTTS)) | Local ONNX Hebrew TTS, offline after model download, named saved voices for a consistent brand identity. `crates/mambotts-py` exposes the engine to Python with a FastAPI server, which is the integration path for Linux/cloud deployment (the desktop app targets macOS Apple Silicon). Optional Qwen3-TTS-he runtime supports reference-audio voice cloning if a specific voice identity is wanted. |
 | **Turn-taking** | Silero VAD + custom barge-in and backchannel logic | The hard part. Hebrew conversational rhythm with a banker is not the same as an English demo. |
 | **Latency budget** | < 800ms perceived response | STT partials + speculative LLM start + TTS first-chunk streaming. Achieving this is the primary technical risk of the voice phase. |
-| **Recording** | Full recording with lawful notice, stored encrypted | See `REGULATORY_STRATEGY.md` §5.4 |
+| **Recording** | Full recording with lawful notice, stored encrypted | One-party consent, lawful. See `REGULATORY_STRATEGY.md` §2. |
 
 **Why self-hosted rather than a commercial realtime voice API**: Hebrew quality from general-purpose providers is materially worse than Hebrew-specialized models; we need a *consistent* voice identity across every call for months, which commercial voice catalogs do not guarantee; and cost at scale on realtime APIs would become the dominant line item in the unit economics rather than a rounding error.
 
@@ -358,7 +356,7 @@ Worth being explicit about, because it is unusual: **this system barely scales w
 ### Decision 9 — Immutable hash-chained action ledger
 - **Decision**: Append-only, hash-chained log of every autonomous action, outbound message, and Layer 1 computation with full inputs and outputs. No updates, no deletes.
 - **Reason**: Three jobs at once — regulatory audit trail, incident forensics, and the evidentiary record that makes our position defensible if a bank or regulator ever asks what we told them and when. Hash chaining means we can demonstrate the record has not been altered after the fact, which is what makes it worth anything in a dispute.
-- **Tension with privacy**: right-to-erasure under Amendment 13 vs. an immutable ledger. Resolved by storing personal data by reference with crypto-shredding of the referenced payload, leaving the chain intact while rendering personal content unrecoverable. Detail in `REGULATORY_STRATEGY.md` §3.4.
+- **Tension with privacy**: deletion rights vs. an immutable ledger. Resolved by storing personal data by reference with crypto-shredding of the referenced payload, leaving the chain intact while rendering personal content unrecoverable. The tension is milder than first assessed — Israeli law has no GDPR-style general erasure right — but crypto-shredding is still unconfirmed as a deletion mechanism. See `REGULATORY_STRATEGY.md` §9.4.
 - **Status**: ⬜ Not started
 
 ### Decision 10 — No lender portal automation, no credential handling
@@ -369,7 +367,7 @@ Worth being explicit about, because it is unusual: **this system barely scales w
 ### Decision 12 — Fleet of advisor identities with persistent banker assignment (Phase 3)
 - **Decision**: support multiple advisor identities, each mapped to a **real registered legal entity or trading name**, each owning a durable book of banker relationships. Enforce unique assignment on **(institution, branch)** and on **(borrower, institution)**.
 - **Reason**: relationship continuity is the point. A banker who repeatedly deals with the same counterpart concedes more than one receiving anonymous volume, so stable assignment converts throughput into relationship capital. A single identity pushing 150 files/month across every institution looks like a firehose and weakens exactly the leverage we depend on.
-- **Uniqueness is enforced as a database index rather than a policy check**, because policies get edited and indexes do not. A banker deals with exactly one of our brands, permanently; a single brand owns each bank relationship for a given file. See `REGULATORY_STRATEGY.md` §5.6.
+- **Uniqueness is enforced as a database index rather than a policy check**, because policies get edited and indexes do not. A banker deals with exactly one of our brands, permanently; a single brand owns each bank relationship for a given file. See `REGULATORY_STRATEGY.md` §5.3.
 - **Identity has no natural-person name field**, so outbound identity is always a real registered brand.
 - **Status**: ⬜ Not started. Phase 3.
 
@@ -475,11 +473,10 @@ Non-closing files cost roughly 40% of a full file (they typically die at intake 
 | Email (dedicated domain + provider) | $25 | $40 | $110 |
 | Telephony (DID + trunk) | $15 | $30 | $90 |
 | Monitoring instance | $45 | $70 | $130 |
-| Credit bureau queries | $0 | $50 | $250 |
-| **Total/month** | **~$212** | **~$790** | **~$2,080** |
-| **+buffer** | **~$250** | **~$900** | **~$2,200** |
+| **Total/month** | **~$212** | **~$740** | **~$1,830** |
+| **+buffer** | **~$250** | **~$850** | **~$1,950** |
 
-Consistent with `BUSINESS_PLAN.md` §3.2 and §3.3.
+Consistent with `BUSINESS_PLAN.md` §3.2 and §3.3. Credit bureau query cost is zero at every stage: we may not pull reports, so credit data always arrives as a borrower upload (`REGULATORY_STRATEGY.md` §4).
 
 ### Cost Sensitivity
 
@@ -498,7 +495,7 @@ Even a 10× miss leaves the business viable, which is the point of choosing a pr
 
 ## 10. Security & Privacy Engineering
 
-We concentrate the most sensitive financial data that exists about a household. Amendment 13 to the Privacy Protection Law (in force 14 Aug 2025) applies to us on two independent grounds — systematic monitoring of individuals, and large-scale processing of specially sensitive information, a category the amendment explicitly broadened to include salary data. Full analysis in `REGULATORY_STRATEGY.md` §3. Engineering requirements:
+We concentrate the most sensitive financial data that exists about a household. Amendment 13 to the Privacy Protection Law (in force 14 Aug 2025) triggers the DPO duty on two independent grounds — systematic monitoring of individuals, and large-scale processing of specially sensitive information, a category the amendment explicitly broadened to include salary and financial-activity data. Full analysis in `REGULATORY_STRATEGY.md` §3. Engineering requirements:
 
 | Requirement | Implementation |
 |-------------|---------------|
@@ -507,11 +504,11 @@ We concentrate the most sensitive financial data that exists about a household. 
 | **Field-level encryption** | Identity numbers, income figures, account numbers, and credit data encrypted at the field level with a separate key, so a database compromise does not yield plaintext financial profiles |
 | Key management | Managed KMS, per-environment keys, documented rotation |
 | Retention & purge | Per-category retention with automated purge. Source documents purged on a short clock after extraction — we need the extracted fields, not the scanned payslip. |
-| Crypto-shredding | Right-to-erasure satisfied by destroying per-subject data keys, leaving the ledger hash chain intact |
+| Crypto-shredding | Deletion requests satisfied by destroying per-subject data keys, leaving the ledger hash chain intact. Position pending counsel — `REGULATORY_STRATEGY.md` §9.4. |
 | Access control | Least privilege; no standing human access to production borrower data; break-glass access logged to the ledger |
 | Audit | Every access to personal data logged |
 | **DPO** | Appointed before the first real client file (mandatory for us under Amendment 13) |
-| Data Security Regulations 2017 | Compliance at the **high** security tier |
+| Data Security Regulations 2017 | Build to the **high** tier. Formal classification is **medium** until 100,000 data subjects or 100+ authorized users, so the 18-month risk survey and penetration test are not yet mandatory — we do them anyway. |
 | Third-party data flows | Documented processor agreements for every provider that touches personal data, including LLM providers; zero-retention configuration required |
 | Call recordings | Encrypted, short retention, lawful notice given |
 
@@ -578,7 +575,7 @@ Detailed week-by-week in `PRODUCT_ROADMAP.md` §2.3. Technical sequencing ration
 
 **Blocking:**
 - [ ] Hebrew document corpus: 60+ documents, 8+ types, de-identified and labeled
-- [ ] Directive 329 parameter set confirmed with a mortgage professional
+- [ ] Directive 329 v13 parameter set loaded as dated config, with the date-aware evaluation path tested (`REGULATORY_STRATEGY.md` §7)
 - [ ] 20 hand-computed golden mortgage scenarios, independently verified
 - [ ] BoI historical rate-by-track series for benchmarking
 
@@ -587,7 +584,7 @@ Detailed week-by-week in `PRODUCT_ROADMAP.md` §2.3. Technical sequencing ration
 - [ ] LLM provider accounts with zero-retention terms
 - [ ] RunPod / GPU account for the voice spike
 - [ ] Israeli DID and SIP trunk provisioned
-- [ ] Legal opinion commissioned (`REGULATORY_STRATEGY.md` §2) — blocks the pilot, not the POC
+- [ ] Confirmatory legal opinion commissioned (`REGULATORY_STRATEGY.md` §9.7) — the POA template and consent flows block the pilot, not the POC
 
 ---
 
@@ -595,9 +592,12 @@ Detailed week-by-week in `PRODUCT_ROADMAP.md` §2.3. Technical sequencing ration
 
 - **`BUSINESS_PLAN.md`** — market, pricing, unit economics, risk
 - **`PRODUCT_ROADMAP.md`** — capability priorities and the week-by-week POC plan
-- **`REGULATORY_STRATEGY.md`** — the constraints behind Decisions 8, 9, and 10
+- **`REGULATORY_STRATEGY.md`** — the constraints behind Decisions 8, 9, 10, and 12
+- **`REGULATORY_ANSWERS.md`** — verified regulatory findings with primary-source citations
 
 ---
 
 **Document Version**: 1.0
-**Open technical questions**: which frontier and mid-tier models to standardize on (defer until week 3, evaluate on our own eval suite rather than on benchmarks); whether to self-host mid-tier models for document work in Phase 2 on privacy grounds; whether the financial core should be extracted as an open-source library to build credibility and inbound interest.
+**Open technical questions**: which frontier and mid-tier models to standardize on (defer until week 3, evaluate on our own eval suite rather than on benchmarks); whether the financial core should be extracted as an open-source library to build credibility and inbound interest.
+
+**Self-hosting the sensitive-data stages is no longer a speculative question.** A Privacy Protection Authority opinion of 13 April 2026 reads the contractual basis for cross-border transfer restrictively (`REGULATORY_STRATEGY.md` §3), which makes a self-hosted path for document extraction and intake more likely than not. Design the Layer 2 boundary so those two stages can swap to local models without touching the negotiation or reporting stack.
