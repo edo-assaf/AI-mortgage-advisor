@@ -35,104 +35,101 @@ That single characteristic drives nearly every decision below. The system is bes
 ## 2. Architecture Overview
 
 ```mermaid
-flowchart TB
-    classDef entry fill:#4CAF50,stroke:#388E3C,stroke-width:2px,color:#fff
-    classDef agent fill:#9C27B0,stroke:#7B1FA2,stroke-width:2px,color:#fff
-    classDef core fill:#F44336,stroke:#C62828,stroke-width:2px,color:#fff
-    classDef service fill:#00BCD4,stroke:#0097A7,stroke-width:2px,color:#000
-    classDef external fill:#FF9800,stroke:#F57C00,stroke-width:2px,color:#000
-    classDef storage fill:#2196F3,stroke:#1976D2,stroke-width:2px,color:#fff
-    classDef orch fill:#607D8B,stroke:#455A64,stroke-width:2px,color:#fff
+flowchart LR
+    %% Styling - Clean contrast for dark and light mode
+    classDef entry fill:#1B5E20,stroke:#81C784,stroke-width:2px,color:#fff
+    classDef agent fill:#4A148C,stroke:#CE93D8,stroke-width:2px,color:#fff
+    classDef core fill:#B71C1C,stroke:#EF9A9A,stroke-width:2px,color:#fff
+    classDef orch fill:#263238,stroke:#B0BEC5,stroke-width:2px,color:#fff
+    classDef service fill:#004D40,stroke:#80CBC4,stroke-width:2px,color:#fff
+    classDef storage fill:#0D47A1,stroke:#90CAF9,stroke-width:2px,color:#fff
+    classDef external fill:#E65100,stroke:#FFCC80,stroke-width:2px,color:#fff
 
-    CHAT[💬 Borrower Chat<br/>Hebrew, text-first]:::entry
-    UPLOAD[📎 Document Upload]:::entry
+    subgraph CLIENT[" 1. BORROWER INTERFACES "]
+        direction TB
+        CHAT["💬 Borrower Chat<br/>(Hebrew, text-first)"]:::entry
+        UPLOAD["📎 Document Upload<br/>(Payslips, Stmts, IDs)"]:::entry
+    end
 
-    TEMPORAL[⏱️ Temporal<br/>File Lifecycle Workflow<br/>4-8 week durable state]:::orch
+    subgraph L2[" 2. LAYER 2 — DURABLE ORCHESTRATION & STATE "]
+        direction TB
+        TEMPORAL["⏱️ Temporal Engine<br/>(4-8 Wk Workflow State)"]:::orch
+        DB[("🗄️ PostgreSQL + pgvector<br/>(Profiles & Match Data)")]:::storage
+        S3[("📦 Object Storage<br/>(Raw Docs & Reports)")]:::storage
+        LEDGER[("📜 Immutable Action Ledger<br/>(Append-Only · Hash-Chained)")]:::storage
+    end
 
-    SUP[🧠 Supervisor Agent<br/>File strategy & routing]:::agent
+    subgraph L3[" 3. LAYER 3 — AGENT HARNESS (Probabilistic) "]
+        direction TB
+        SUP["🧠 Supervisor Agent<br/>(File Strategy & Routing)"]:::agent
+        
+        subgraph AGENTS[" Specialist Sub-Agents "]
+            direction TB
+            INTAKE["🗣️ Intake Agent"]:::agent
+            DOCS["📄 Document Agent (VLM)"]:::agent
+            NEG["🤝 Negotiation Agent"]:::agent
+            VERIFY["🔍 Verification Agent"]:::agent
+            WRITER["✍️ Report Agent"]:::agent
+        end
+        
+        MEM["🧬 Memory Service<br/>(Banker & Entity History)"]:::service
+    end
 
-    INTAKE[🗣️ Intake Agent]:::agent
-    DOCS[📄 Document Agent<br/>VLM extraction]:::agent
-    NEG[🤝 Negotiation Agent<br/>Tactics & leverage]:::agent
-    VERIFY[🔍 Verification Agent<br/>Contract diff]:::agent
-    WRITER[✍️ Report Agent<br/>Hebrew narrative]:::agent
+    subgraph L1[" 4. LAYER 1 — FINANCIAL CORE (Deterministic · Pure Python) "]
+        direction TB
+        FIN["🧮 Financial Engine<br/>Amortization · Optimizer · Stress<br/>(Pure Decimal · Zero LLM)"]:::core
+        COMP["⚖️ Compliance Engine<br/>Directive 329 Hard Gate<br/>(100% Rules Coverage)"]:::core
+        MARKET["📈 Market Data Service<br/>(BoI Rates · CPI · Benchmarks)"]:::core
+    end
 
-    FIN[🧮 FINANCIAL CORE<br/>Amortization · Optimizer<br/>Stress tests<br/>NO LLM]:::core
-    COMP[⚖️ COMPLIANCE ENGINE<br/>Directive 329<br/>Hard gate]:::core
+    subgraph OUTBOUND[" 5. GUARDED CHANNELS & EXTERNAL LENDERS "]
+        direction TB
+        GUARD["🛡️ Guardrail Service<br/>(Circuit Breakers · Send Caps)"]:::orch
+        COMMS["📡 Comms Gateway<br/>(Email · WhatsApp)"]:::service
+        VOICE["🎙️ Voice Stack<br/>(Hebrew STT/TTS)"]:::service
+        LENDERS[("🏦 Israeli Mortgage Lenders<br/>(5 Simulated + Real Banks)")]:::external
+    end
 
-    COMMS[📡 Communication Gateway<br/>Email · Voice · WhatsApp]:::service
-    VOICE[🎙️ Voice Stack<br/>Hebrew STT/TTS<br/>Turn-taking]:::service
-    MEM[🧬 Memory Service<br/>Entity · Episodic · Semantic]:::service
-    MARKET[📈 Market Data Service<br/>BoI rate · CPI · benchmarks]:::service
-    GUARD[🛡️ Guardrail Service<br/>Circuit breakers · caps]:::service
+    BOI[("🏛️ Bank of Israel<br/>(Rates & Macro CPI)")]:::external
 
-    LENDERS[(🏦 Lenders<br/>real or simulated)]:::external
-    BOI[(Bank of Israel<br/>rates & CPI)]:::external
-
-    DB[(PostgreSQL<br/>+ pgvector)]:::storage
-    LEDGER[(Immutable<br/>Action Ledger)]:::storage
-    S3[(Object Store<br/>documents & reports)]:::storage
-
+    %% Ingress Flow
     CHAT --> TEMPORAL
-    UPLOAD --> TEMPORAL
-    TEMPORAL <--> SUP
+    UPLOAD --> S3
+    TEMPORAL --> SUP
 
+    %% Supervisor Delegation
     SUP --> INTAKE
     SUP --> DOCS
     SUP --> NEG
     SUP --> VERIFY
     SUP --> WRITER
+    SUP --> MEM
 
-    INTAKE -->|request computation| FIN
-    NEG -->|request computation| FIN
-    WRITER -->|read results| FIN
-    FIN -->|every structure| COMP
-    COMP -->|pass/fail + reason| FIN
-
-    DOCS --> S3
-    DOCS -->|extracted fields| DB
-
-    SUP --> COMMS
-    NEG --> COMMS
-    COMMS --> VOICE
-    COMMS <-->|email · phone| LENDERS
-    VOICE <--> LENDERS
-
-    SUP <--> MEM
-    NEG <--> MEM
+    %% Data Extraction and Storage
+    DOCS --> DB
     MEM --> DB
 
-    MARKET <--> BOI
-    NEG <--> MARKET
-    FIN <--> MARKET
+    %% Layer 3 to Layer 1 Strict Contracts (Thick Edges)
+    INTAKE ==>|1. Request compute| FIN
+    NEG ==>|2. Optimize mix / rates| FIN
+    WRITER ==>|3. Read computed metrics| FIN
 
-    SUP --> GUARD
+    %% Inside Layer 1 & Macro Ingestion
+    FIN <==>|Strict regulatory gate| COMP
+    MARKET --> FIN
+    BOI --> MARKET
+
+    %% Outbound Negotiation Flow
+    NEG --> COMMS
     COMMS --> GUARD
-    GUARD -->|block or allow| COMMS
+    GUARD -->|Safe email tender| LENDERS
+    COMMS --> VOICE
+    VOICE <-->|Live phone calls| LENDERS
 
-    TEMPORAL --> LEDGER
-    COMMS --> LEDGER
-    FIN --> LEDGER
-
-    subgraph L1[" 🔴 LAYER 1 — DETERMINISTIC "]
-        FIN
-        COMP
-    end
-
-    subgraph L2[" ⚙️ LAYER 2 — DURABLE ORCHESTRATION "]
-        TEMPORAL
-        GUARD
-        LEDGER
-    end
-
-    subgraph L3[" 🟣 LAYER 3 — AGENTS "]
-        SUP
-        INTAKE
-        DOCS
-        NEG
-        VERIFY
-        WRITER
-    end
+    %% Audit Ledger (Append-only from all critical steps)
+    TEMPORAL -.-> LEDGER
+    FIN -.-> LEDGER
+    GUARD -.-> LEDGER
 ```
 
 **Key:**
