@@ -102,7 +102,7 @@ flowchart TB
     NEG <--> MEM
     MEM --> DB
 
-    MARKET <-- BOI
+    MARKET <--> BOI
     NEG <--> MARKET
     FIN <--> MARKET
 
